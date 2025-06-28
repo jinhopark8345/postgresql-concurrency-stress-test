@@ -35,3 +35,8 @@ def write_log(message: str = "Hello", db: Session = Depends(get_db)):
     db.add(Log(message=message))
     db.commit()
     return {"status": "ok"}
+
+@app.get("/messages")
+def read_logs(limit: int = 100, db: Session = Depends(get_db)):
+    logs = db.query(Log).order_by(Log.id.desc()).limit(limit).all()
+    return [{"id": log.id, "message": log.message} for log in logs]

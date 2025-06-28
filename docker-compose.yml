@@ -9,7 +9,7 @@ services:
     restart: unless-stopped
     image: postgres:17
     volumes:
-      - postgres_db:/var/lib/postgresql/data
+      - ./postgres_db:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=${DATABASE__DB}
       - POSTGRES_USER=${DATABASE__USERNAME}
@@ -19,5 +19,5 @@ services:
     ports:
       - "${DATABASE__PORT}:5432"
 
-volumes:
-  postgres_db:
+# volumes:
+#   postgres_db:
