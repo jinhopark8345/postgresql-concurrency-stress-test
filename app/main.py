@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 from loguru import logger
+import json
 
 load_dotenv()
 
@@ -41,7 +42,8 @@ app = FastAPI()
 class Log(Base):
     __tablename__ = "logs"
     id = Column(Integer, primary_key=True, index=True)
-    message = Column(JSON)
+    # message = Column(JSON)
+    message = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class LogInput(BaseModel):
@@ -49,7 +51,7 @@ class LogInput(BaseModel):
 
 class LogOutput(BaseModel):
     id: int
-    message: dict
+    message: str
 
 
 # --- DB Dependency ---
@@ -65,9 +67,20 @@ async def on_startup():
 
 @app.post("/write")
 async def write_log(input: LogInput, db: AsyncSession = Depends(get_db)):
-    db.add(Log(message=input.message))
+    # db.add(Log(message=input.message))
+    serialized_message = json.dumps(input.message, ensure_ascii=False)
+    db.add(Log(message=serialized_message))
     await db.commit()
     return {"status": "ok"}
+
+# @app.get("/messages")
+# async def read_logs(limit: int = 100, db: AsyncSession = Depends(get_db)):
+#     result = await db.execute(
+#         Log.__table__.select().order_by(Log.id.desc()).limit(limit)
+#     )
+#     rows = result.fetchall()
+#     return [{"id": row.id, "message": row.message} for row in rows]
+
 
 @app.get("/messages")
 async def read_logs(limit: int = 100, db: AsyncSession = Depends(get_db)):
