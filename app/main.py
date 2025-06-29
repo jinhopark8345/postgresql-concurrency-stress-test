@@ -11,8 +11,13 @@ from loguru import logger
 
 load_dotenv()
 
+# DATABASE_URL = (
+#     f"postgresql+psycopg2://{os.getenv('DATABASE__USERNAME')}:{os.getenv('DATABASE__PASSWORD')}"
+#     f"@localhost:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
+# )
+
 DATABASE_URL = (
-    f"postgresql+psycopg2://{os.getenv('DATABASE__USERNAME')}:{os.getenv('DATABASE__PASSWORD')}"
+    f"postgresql+asyncpg://{os.getenv('DATABASE__USERNAME')}:{os.getenv('DATABASE__PASSWORD')}"
     f"@localhost:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
 )
 
@@ -22,14 +27,29 @@ logger.info(f'{DATABASE_URL=}')  # Debugging line to check the DATABASE_URL
 
 # pool_size=50: Number of connections kept open
 # max_overflow=100: How many additional "overflow" connections can be opened
-engine = create_engine(
+# engine = create_engine(
+#     DATABASE_URL,
+#     pool_pre_ping=True,
+#     pool_size=50,
+#     max_overflow=100,
+# )
+
+# --- Async SQLAlchemy setup ---
+engine = create_async_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
+    echo=False,
     pool_size=50,
-    max_overflow=100,
+    max_overflow=100
 )
 
-SessionLocal = sessionmaker(bind=engine)
+AsyncSessionLocal = sessionmaker(
+    bind=engine,
+    expire_on_commit=False,
+    class_=AsyncSession,
+)
+
+
+# SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
 app = FastAPI()
@@ -47,22 +67,28 @@ class LogOutput(BaseModel):
     id: int
     message: dict
 
-Base.metadata.create_all(bind=engine)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# --- DB Dependency ---
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
+# --- Routes ---
+@app.on_event("startup")
+async def on_startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 @app.post("/write")
-def write_log(input: LogInput, db: Session = Depends(get_db)):
+async def write_log(input: LogInput, db: AsyncSession = Depends(get_db)):
     db.add(Log(message=input.message))
-    db.commit()
+    await db.commit()
     return {"status": "ok"}
 
 @app.get("/messages")
-def read_logs(limit: int = 100, db: Session = Depends(get_db)):
-    logs = db.query(Log).order_by(Log.id.desc()).limit(limit).all()
-    return logs
+async def read_logs(limit: int = 100, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        Log.__table__.select().order_by(Log.id.desc()).limit(limit)
+    )
+    rows = result.fetchall()
+    return [{"id": row.id, "message": row.message} for row in rows]
