@@ -11,35 +11,19 @@ from loguru import logger
 
 load_dotenv()
 
-# DATABASE_URL = (
-#     f"postgresql+psycopg2://{os.getenv('DATABASE__USERNAME')}:{os.getenv('DATABASE__PASSWORD')}"
-#     f"@localhost:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
-# )
-
 DATABASE_URL = (
     f"postgresql+asyncpg://{os.getenv('DATABASE__USERNAME')}:{os.getenv('DATABASE__PASSWORD')}"
     f"@localhost:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
 )
 
 logger.info(f'{DATABASE_URL=}')  # Debugging line to check the DATABASE_URL
-# DATABASE_URL = "postgresql+psycopg2://rDGJeEDqAz:XsPQhCoEfOQZueDjsILetLDUvbvSxAMnrVtgVZpmdcSssUgbvs@localhost:5455/default_db"
-# print(f'{DATABASE_URL=}')  # Debugging line to check the DATABASE_URL
-
-# pool_size=50: Number of connections kept open
-# max_overflow=100: How many additional "overflow" connections can be opened
-# engine = create_engine(
-#     DATABASE_URL,
-#     pool_pre_ping=True,
-#     pool_size=50,
-#     max_overflow=100,
-# )
 
 # --- Async SQLAlchemy setup ---
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
     pool_size=50,
-    max_overflow=100
+    max_overflow=20
 )
 
 AsyncSessionLocal = sessionmaker(
