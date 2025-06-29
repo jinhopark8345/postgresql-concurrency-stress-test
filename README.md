@@ -8,7 +8,8 @@ postgresql-concurrency-stress-test
 docker-compuse up
 
 # run fastapi server from project root
-uvicorn app.main:app
+# uvicorn app.main:app
+ulimit -n 65535 # resolve 
 gunicorn app.main:app -w 6 -k uvicorn.workers.UvicornWorker
 
 # run locust from project root
