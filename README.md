@@ -4,8 +4,11 @@ postgresql-concurrency-stress-test
 
 ### how to run 
 ```
-# run postgresql container from project root
+# run postgresql service (container) from project root
 docker-compuse up
+
+# run redis service
+docker run -d --name redis -p 6379:6379 redis:7-alpine
 
 # run fastapi server from project root
 # uvicorn app.main:app
