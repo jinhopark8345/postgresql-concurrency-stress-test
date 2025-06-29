@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy import DateTime, func
@@ -19,7 +20,15 @@ logger.info(f'{DATABASE_URL=}')  # Debugging line to check the DATABASE_URL
 # DATABASE_URL = "postgresql+psycopg2://rDGJeEDqAz:XsPQhCoEfOQZueDjsILetLDUvbvSxAMnrVtgVZpmdcSssUgbvs@localhost:5455/default_db"
 # print(f'{DATABASE_URL=}')  # Debugging line to check the DATABASE_URL
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# pool_size=50: Number of connections kept open
+# max_overflow=100: How many additional "overflow" connections can be opened
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=50,
+    max_overflow=100,
+)
+
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
