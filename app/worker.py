@@ -15,9 +15,9 @@ load_dotenv()
 # --- Config ---
 DATABASE_URL = (
     f"postgresql+asyncpg://{os.getenv('DATABASE__USERNAME')}:{os.getenv('DATABASE__PASSWORD')}"
-    f"@localhost:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
+    f"@postgres:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
 )
-REDIS_URL = "redis://localhost"
+REDIS_URL = "redis://redis"
 REDIS_STREAM_KEY = "logs_stream"
 REDIS_GROUP = "log_consumers"
 REDIS_CONSUMER_NAME = os.getenv("REDIS_CONSUMER_NAME", "log_worker")
@@ -46,7 +46,7 @@ async def redis_worker(name: str):
                 groupname=REDIS_GROUP,
                 consumername=name,
                 streams={REDIS_STREAM_KEY: '>'},
-                count=100,
+                count=500,
                 block=1000
             )
             if not results:

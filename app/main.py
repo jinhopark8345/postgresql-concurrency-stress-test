@@ -15,7 +15,7 @@ load_dotenv()
 
 DATABASE_URL = (
     f"postgresql+asyncpg://{os.getenv('DATABASE__USERNAME')}:{os.getenv('DATABASE__PASSWORD')}"
-    f"@localhost:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
+    f"@postgres:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
 )
 
 logger.info(f'{DATABASE_URL=}')
@@ -24,8 +24,9 @@ engine = create_async_engine(DATABASE_URL, echo=False, pool_size=50, max_overflo
 AsyncSessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
 Base = declarative_base()
 
+REDIS_URL = "redis://redis"
 REDIS_STREAM_KEY = "logs_stream"
-redis_client = aioredis.Redis.from_url("redis://localhost")
+redis_client = aioredis.Redis.from_url(REDIS_URL)
 
 app = FastAPI()
 
