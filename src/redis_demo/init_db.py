@@ -1,6 +1,6 @@
 # init_db.py
 import asyncio
-from main import engine, Base
+from redis_demo.producer import engine, Base
 
 async def init():
     async with engine.begin() as conn:

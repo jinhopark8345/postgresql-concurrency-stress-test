@@ -7,7 +7,7 @@ WORKER=worker
 
 # ⛏️ Build and start services
 up:
-	$(COMPOSE) up --build -d
+	$(COMPOSE) up --build
 
 # 🔻 Stop services
 down:

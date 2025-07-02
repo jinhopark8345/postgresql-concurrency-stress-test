@@ -7,14 +7,15 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_app
     volumes:
-      - ./app:/app
+      - .:/app
     env_file: .env
     ports:
       - "8000:8000"
     # command: gunicorn main:app -w 8 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
     command: >
-        sh -c "python init_db.py &&
-        gunicorn main:app -w 8 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000"
+        sh -c "pip install -e . &&
+        python /app/src/redis_demo/init_db.py &&
+        gunicorn redis_demo.producer:app -w 8 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000"
 
     depends_on:
       - postgres
