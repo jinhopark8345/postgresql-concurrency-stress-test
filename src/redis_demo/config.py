@@ -13,7 +13,9 @@ DATABASE_URL = (
     f"@postgres:{os.getenv('DATABASE__PORT')}/{os.getenv('DATABASE__DB')}"
 )
 engine = create_async_engine(DATABASE_URL, echo=False, pool_size=50, max_overflow=20)
-AsyncSessionLocal = sessionmaker(bind=engine, expire_on_commit=False, class_=AsyncSession)
+AsyncSessionLocal = sessionmaker(
+    bind=engine, expire_on_commit=False, class_=AsyncSession
+)
 
 # Redis
 REDIS_URL = "redis://redis"

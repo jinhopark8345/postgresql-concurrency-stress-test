@@ -8,8 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.future import select
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from redis_demo.config import (REDIS_STREAM_KEY, AsyncSessionLocal, engine,
-                               redis_client)
+from redis_demo.config import REDIS_STREAM_KEY, AsyncSessionLocal, engine, redis_client
 from redis_demo.models import Base, Log
 
 app = FastAPI(default_response_class=ORJSONResponse)
@@ -18,56 +17,69 @@ app = FastAPI(default_response_class=ORJSONResponse)
 class LogInput(BaseModel):
     message: dict
 
-# from fastapi import Request
-# from fastapi.responses import HTMLResponse
-# from pyinstrument import Profiler
+
+import asyncio
+
+log_buffer = []
+buffer_lock = asyncio.Lock()
+FLUSH_SIZE = 1000
+FLUSH_INTERVAL = 0.1
 
 
-# @app.middleware("http")
-# async def profile_request(request: Request, call_next):
-#     profiling = request.query_params.get("profile", False)
-#     if profiling:
-#         profiler = Profiler()
-#         profiler.start()
+@app.on_event("startup")
+async def start_batch_flusher():
+    async def flush_loop():
+        while True:
+            await asyncio.sleep(FLUSH_INTERVAL)
+            async with buffer_lock:
+                if log_buffer:
+                    pipe = redis_client.pipeline()
+                    for msg in log_buffer:
+                        pipe.xadd(
+                            REDIS_STREAM_KEY,
+                            fields={"data": orjson.dumps(msg).decode()},
+                            id="*",
+                            maxlen=1000000,
+                        )
+                    await pipe.execute()
+                    log_buffer.clear()
 
-#         response = await call_next(request)  # ❗ Capture response
-#         profiler.stop()
-
-#         path = "/app/profile.html"
-#         with open(path, "w") as f:
-#             f.write(profiler.output_html())
-
-#         return HTMLResponse(content=f"Saved to {path}")
-
-#         # html = profiler.output_html()
-#         # return HTMLResponse(content=html, media_type="text/html")  # ❗ Return HTML report
-
-#     else:
-#         return await call_next(request)
+    asyncio.create_task(flush_loop())
 
 
 # @app.post("/write")
 # async def write_log(input: LogInput):
 #     await redis_client.xadd(
 #         REDIS_STREAM_KEY,
-#         fields={"data": json.dumps(input.message, ensure_ascii=False)},
+#         fields={"data": orjson.dumps(input.message).decode()},
 #         id="*",
 #         maxlen=1000000
 #     )
 #     return {"status": "queued"}
 
+
 @app.post("/write")
 async def write_log(input: LogInput):
-    await redis_client.xadd(
-        REDIS_STREAM_KEY,
-        fields={"data": orjson.dumps(input.message).decode()},
-        id="*",
-        maxlen=1000000
-    )
+    async with buffer_lock:
+        log_buffer.append(input.message)
+        if len(log_buffer) >= FLUSH_SIZE:
+            pipe = redis_client.pipeline()
+            for msg in log_buffer:
+                pipe.xadd(
+                    REDIS_STREAM_KEY,
+                    fields={"data": orjson.dumps(msg).decode()},
+                    id="*",
+                    maxlen=1000000,
+                )
+            await pipe.execute()
+            log_buffer.clear()
     return {"status": "queued"}
+
 
 @app.get("/messages")
 async def read_logs(limit: int = 100):
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Log).order_by(Log.id.desc()).limit(limit))
-        return [{"id": row.id, "message": row.message} for row in result.scalars().all()]
+        return [
+            {"id": row.id, "message": row.message} for row in result.scalars().all()
+        ]

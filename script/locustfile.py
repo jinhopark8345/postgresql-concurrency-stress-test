@@ -12,9 +12,7 @@ class PostgresWriteUser(HttpUser):
     def write_log(self):
         log_data = self.generate_random_log()
         self.client.post(
-            "/write",
-            json={"message": log_data},
-            headers={"accept": "application/json"}
+            "/write", json={"message": log_data}, headers={"accept": "application/json"}
         )
 
     def generate_random_log(self):
