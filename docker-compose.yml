@@ -1,11 +1,9 @@
-version: "3.9"
-
 services:
-  web:
+  producer:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: fastapi_app
+    container_name: producer_fastapi_app
     volumes:
       - .:/app
     env_file: .env
@@ -17,19 +15,25 @@ services:
         python /app/src/redis_demo/init_db.py &&
         gunicorn redis_demo.producer:app -w 8 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000"
 
+    # uvicorn redis_demo.producer:app --host 0.0.0.0 --port 8000 --reload"
+    # pyinstrument -o /app/profile.html -r html -m uvicorn redis_demo.producer:app --host 0.0.0.0 --port 8000 --reload"
+    # pyinstrument -m uvicorn app.main:app --reload
+
     depends_on:
       - postgres
       - redis
     restart: unless-stopped
 
-  worker:
+  consumer:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: log_worker
+    container_name: consumer_log_worker
     volumes:
-      - ./app:/app
-    command: python worker.py
+      - .:/app
+    command: >
+        sh -c "pip install -e . &&
+        python /app/src/redis_demo/consumer.py"
     env_file: .env
     depends_on:
       - postgres
@@ -50,7 +54,7 @@ services:
       POSTGRES_USER: ${DATABASE__USERNAME}
       POSTGRES_PASSWORD: ${DATABASE__PASSWORD}
     restart: unless-stopped
-    command: postgres -c max_connections=2000
+    command: postgres -c max_connections=2000 -c synchronous_commit=off
 
   redis:
     image: redis:7-alpine

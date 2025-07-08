@@ -1,13 +1,16 @@
 import asyncio
 import json
-from redis.exceptions import ResponseError
-from loguru import logger
 
-from redis_demo.config import (
-    redis_client, AsyncSessionLocal, REDIS_STREAM_KEY,
-    REDIS_GROUP, REDIS_CONSUMER_NAME, NUM_WORKERS
-)
-from models import Log
+from loguru import logger
+from redis.exceptions import ResponseError
+from sqlalchemy import insert
+
+from redis_demo.config import (NUM_WORKERS, REDIS_CONSUMER_NAME, REDIS_GROUP,
+                               REDIS_STREAM_KEY, AsyncSessionLocal,
+                               redis_client)
+from redis_demo.models import Log  # NOTE: use full import path
+
+BATCH_SIZE = 100
 
 async def redis_worker(name: str):
     while True:
@@ -16,30 +19,34 @@ async def redis_worker(name: str):
                 groupname=REDIS_GROUP,
                 consumername=name,
                 streams={REDIS_STREAM_KEY: '>'},
-                count=500,
-                block=1000
+                count=BATCH_SIZE,
+                block=1000  # ms
             )
             if not results:
                 continue
 
-            logs_to_insert, msg_ids = [], []
+            values_to_insert = []
+            msg_ids = []
+
             for _, messages in results:
                 for msg_id, msg_data in messages:
                     try:
                         raw = msg_data[b"data"].decode()
-                        logs_to_insert.append(Log(message=raw))
+                        values_to_insert.append({"message": raw})
                         msg_ids.append(msg_id)
                     except Exception as e:
                         logger.warning(f"[{name}] Bad msg {msg_id}: {e}")
 
-            async with AsyncSessionLocal() as db:
-                try:
-                    db.add_all(logs_to_insert)
-                    await db.commit()
-                    await redis_client.xack(REDIS_STREAM_KEY, REDIS_GROUP, *msg_ids)
-                except Exception as e:
-                    logger.error(f"[{name}] DB error: {e}")
-                    await db.rollback()
+            # if values_to_insert:
+            #     async with AsyncSessionLocal() as db:
+            #         try:
+            #             stmt = insert(Log).values(values_to_insert)
+            #             await db.execute(stmt)
+            #             await db.commit()
+            #             await redis_client.xack(REDIS_STREAM_KEY, REDIS_GROUP, *msg_ids)
+            #         except Exception as e:
+            #             logger.error(f"[{name}] DB error: {e}")
+            #             await db.rollback()
         except Exception as e:
             logger.error(f"[{name}] Redis error: {e}")
             await asyncio.sleep(1)

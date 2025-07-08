@@ -5,3 +5,7 @@ asyncpg
 redis
 loguru
 python-dotenv
+orjson
+pyinstrument
+gunicorn
+py-spy

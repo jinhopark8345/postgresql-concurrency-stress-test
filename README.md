@@ -2,7 +2,7 @@
 postgresql-concurrency-stress-test
 
 
-### how to run 
+### how to run
 ```
 # run postgresql service (container) from project root
 docker-compuse up
@@ -12,7 +12,7 @@ docker run -d --name redis -p 6379:6379 redis:7-alpine
 
 # run fastapi server from project root
 # uvicorn app.main:app
-ulimit -n 65535 # resolve 
+ulimit -n 65535 # resolve
 gunicorn app.main:app -w 8 -k uvicorn.workers.UvicornWorker
 
 # run locust from project root
@@ -71,30 +71,27 @@ To ingest logs via HTTP and persist them efficiently in PostgreSQL using:
 - locustfile.py: Generates synthetic log traffic to POST /write for load testing.
 
 
-### 🔄 5. Data Flow Summary
-       ┌─────────────┐
-       │ User Client │
-       └─────┬───────┘
-             │
-        HTTP POST /write
-             │
-       ┌─────▼──────┐
-       │ FastAPI    │
-       │ App        │
-       └─────┬──────┘
-     Redis XADD "logs_stream"
-             │
-       ┌─────▼──────┐
-       │ Redis      │
-       │ Stream     │
-       └─────┬──────┘
-      xreadgroup by workers
-             │
-      ┌──────▼───────┐
-      │ worker.py    │
-      │ (N workers)  │
-      └──────┬───────┘
- Bulk INSERT │
-      ┌──────▼───────┐
-      │ PostgreSQL   │
-      └──────────────┘
+### 🔄 5. Architecture overview
++-------------+
+|  Locust     |  (Load Gen)
++------+------+
+       |
+       v
++------+------+
+|   FastAPI    |  (Producer)
++------+------+
+       |
+       v
++------+------+
+|   Redis      |  (Stream Queue)
++------+------+
+       |
+       v
++------+------+
+|  Workers     |  (Consumers)
++------+------+
+       |
+       v
++-------------+
+| PostgreSQL   |
++-------------+
