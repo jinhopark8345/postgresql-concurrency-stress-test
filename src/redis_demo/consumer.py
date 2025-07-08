@@ -43,16 +43,16 @@ async def redis_worker(name: str):
                     except Exception as e:
                         logger.warning(f"[{name}] Bad msg {msg_id}: {e}")
 
-            # if values_to_insert:
-            #     async with AsyncSessionLocal() as db:
-            #         try:
-            #             stmt = insert(Log).values(values_to_insert)
-            #             await db.execute(stmt)
-            #             await db.commit()
-            #             await redis_client.xack(REDIS_STREAM_KEY, REDIS_GROUP, *msg_ids)
-            #         except Exception as e:
-            #             logger.error(f"[{name}] DB error: {e}")
-            #             await db.rollback()
+            if values_to_insert:
+                async with AsyncSessionLocal() as db:
+                    try:
+                        stmt = insert(Log).values(values_to_insert)
+                        await db.execute(stmt)
+                        await db.commit()
+                        await redis_client.xack(REDIS_STREAM_KEY, REDIS_GROUP, *msg_ids)
+                    except Exception as e:
+                        logger.error(f"[{name}] DB error: {e}")
+                        await db.rollback()
         except Exception as e:
             logger.error(f"[{name}] Redis error: {e}")
             await asyncio.sleep(1)

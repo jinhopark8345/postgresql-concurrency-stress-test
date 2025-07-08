@@ -6,7 +6,8 @@ from locust import HttpUser, between, task
 
 
 class PostgresWriteUser(HttpUser):
-    wait_time = between(0.05, 0.15)  # simulate user delay
+    # wait_time = between(0.05, 0.15)  # simulate user delay
+    wait_time = between(0.10, 0.10)  # simulate user delay
 
     @task
     def write_log(self):
