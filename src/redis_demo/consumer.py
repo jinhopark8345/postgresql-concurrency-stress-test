@@ -1,21 +1,36 @@
 import asyncio
 import json
+from time import time_ns  
 
+
+import aiohttp
 from loguru import logger
 from redis.exceptions import ResponseError
-from sqlalchemy import insert
 
 from redis_demo.config import (
     NUM_WORKERS,
     REDIS_CONSUMER_NAME,
     REDIS_GROUP,
     REDIS_STREAM_KEY,
-    AsyncSessionLocal,
     redis_client,
 )
-from redis_demo.models import Log  # NOTE: use full import path
 
 BATCH_SIZE = 100
+LOKI_URL = "http://loki:3100/loki/api/v1/push"  # Loki URL inside Docker network
+
+
+async def push_to_loki(logs):
+    streams = [
+        {
+            "stream": {"job": "log_worker"},
+            "values": [[str(time_ns()), log] for log in logs],
+        }
+    ]
+    async with aiohttp.ClientSession() as session:
+        async with session.post(LOKI_URL, json={"streams": streams}) as resp:
+            if resp.status != 204:
+                text = await resp.text()
+                logger.error(f"Failed to push to Loki: {resp.status} {text}")
 
 
 async def redis_worker(name: str):
@@ -31,28 +46,22 @@ async def redis_worker(name: str):
             if not results:
                 continue
 
-            values_to_insert = []
+            logs = []
             msg_ids = []
 
             for _, messages in results:
                 for msg_id, msg_data in messages:
                     try:
                         raw = msg_data[b"data"].decode()
-                        values_to_insert.append({"message": raw})
+                        logs.append(raw)
                         msg_ids.append(msg_id)
                     except Exception as e:
                         logger.warning(f"[{name}] Bad msg {msg_id}: {e}")
 
-            if values_to_insert:
-                async with AsyncSessionLocal() as db:
-                    try:
-                        stmt = insert(Log).values(values_to_insert)
-                        await db.execute(stmt)
-                        await db.commit()
-                        await redis_client.xack(REDIS_STREAM_KEY, REDIS_GROUP, *msg_ids)
-                    except Exception as e:
-                        logger.error(f"[{name}] DB error: {e}")
-                        await db.rollback()
+            if logs:
+                await push_to_loki(logs)
+                await redis_client.xack(REDIS_STREAM_KEY, REDIS_GROUP, *msg_ids)
+
         except Exception as e:
             logger.error(f"[{name}] Redis error: {e}")
             await asyncio.sleep(1)

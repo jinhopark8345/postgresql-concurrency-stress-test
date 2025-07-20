@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.future import select
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from redis_demo.config import REDIS_STREAM_KEY, AsyncSessionLocal, engine, redis_client
+from redis_demo.config import REDIS_STREAM_KEY, redis_client
 from redis_demo.models import Base, Log
 
 app = FastAPI(default_response_class=ORJSONResponse)
@@ -45,18 +45,6 @@ async def start_batch_flusher():
                     log_buffer.clear()
 
     asyncio.create_task(flush_loop())
-
-
-# @app.post("/write")
-# async def write_log(input: LogInput):
-#     await redis_client.xadd(
-#         REDIS_STREAM_KEY,
-#         fields={"data": orjson.dumps(input.message).decode()},
-#         id="*",
-#         maxlen=1000000
-#     )
-#     return {"status": "queued"}
-
 
 @app.post("/write")
 async def write_log(input: LogInput):
